@@ -32,7 +32,7 @@ class WorkflowTest(unittest.TestCase):
 
     def test_full_workflow(self):
         created = {}
-        steps = [{'op': 'create', 'as': 'case', 'kind': 'case', 'data': {'person_id': 'P-1', 'onset_date': '2026-03-01', 'location': 'District-A', 'symptoms': ['fever']}}, {'op': 'transition', 'target': 'case', 'action': 'triage', 'data': {'clinician': 'C-1'}, 'expect': 'investigating'}, {'op': 'transition', 'target': 'case', 'action': 'lab_positive', 'data': {'lab_id': 'L-1', 'result': 'positive'}, 'expect': 'confirmed'}, {'op': 'transition', 'target': 'case', 'action': 'recover', 'data': {'recovered_at': '2026-03-10'}, 'expect': 'recovered'}, {'op': 'transition', 'target': 'case', 'action': 'close', 'data': {'outcome': 'recovered'}, 'expect': 'closed'}, {'op': 'create', 'as': 'contact', 'kind': 'contact', 'data': {'case_id': '{case}', 'person_id': 'P-2', 'exposure_start': '2026-02-25'}}, {'op': 'transition', 'target': 'contact', 'action': 'begin_followup', 'data': {'followup_start': '2026-03-02', 'due_at': '2026-03-16'}, 'expect': 'following'}, {'op': 'transition', 'target': 'contact', 'action': 'complete_followup', 'data': {'outcome': 'no symptoms'}, 'expect': 'completed'}]
+        steps = [{'op': 'create', 'as': 'case', 'kind': 'case', 'data': {'person_id': 'P-1', 'onset_date': '2026-03-01', 'location': 'District-A', 'symptoms': ['fever']}}, {'op': 'transition', 'target': 'case', 'action': 'triage', 'data': {'clinician': 'C-1'}, 'expect': 'investigating'}, {'op': 'create', 'as': 'batch', 'kind': 'batch', 'data': {'name': 'B-2026-001', 'lab_id': 'L-1'}}, {'op': 'create', 'as': 'sample', 'kind': 'sample', 'data': {'case_id': '{case}', 'batch_id': '{batch}', 'sample_type': 'throat_swab'}}, {'op': 'transition', 'target': 'sample', 'action': 'screen', 'data': {'result': 'positive'}, 'expect': 'pending_review'}, {'op': 'get', 'target': 'case', 'expect': 'investigating'}, {'op': 'transition', 'target': 'sample', 'action': 'review', 'data': {'result': 'positive'}, 'expect': 'confirmed_positive'}, {'op': 'get', 'target': 'case', 'expect': 'confirmed'}, {'op': 'transition', 'target': 'case', 'action': 'recover', 'data': {'recovered_at': '2026-03-10'}, 'expect': 'recovered'}, {'op': 'transition', 'target': 'case', 'action': 'close', 'data': {'outcome': 'recovered'}, 'expect': 'closed'}, {'op': 'create', 'as': 'contact', 'kind': 'contact', 'data': {'case_id': '{case}', 'person_id': 'P-2', 'exposure_start': '2026-02-25'}}, {'op': 'transition', 'target': 'contact', 'action': 'begin_followup', 'data': {'followup_start': '2026-03-02', 'due_at': '2026-03-16'}, 'expect': 'following'}, {'op': 'transition', 'target': 'contact', 'action': 'complete_followup', 'data': {'outcome': 'no symptoms'}, 'expect': 'completed'}]
         for step in steps:
             if step["op"] == "create":
                 entity = self.service.create(
@@ -42,6 +42,8 @@ class WorkflowTest(unittest.TestCase):
                     step.get("idempotency_key"),
                 )
                 created[step["as"]] = entity["id"]
+            elif step["op"] == "get":
+                entity = self.service.get(created[step["target"]])
             else:
                 entity = self.service.transition(
                     self.actor,

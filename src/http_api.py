@@ -85,6 +85,12 @@ def create_handler(service, rules, static_dir):
                         return self._send_html(200, handle.read())
                 if parts == ["api", "audit"]:
                     return self._send(200, {"items": service.audit_log()})
+                if parts == ["api", "lab", "pending"]:
+                    return self._send(200, service.lab_pending())
+                if len(parts) == 4 and parts[:2] == ["api", "batches"] and parts[3] == "progress":
+                    return self._send(200, service.batch_progress(parts[2]))
+                if len(parts) == 4 and parts[:2] == ["api", "cases"] and parts[3] == "lab":
+                    return self._send(200, service.case_lab_status(parts[2]))
                 if len(parts) == 3 and parts[:2] == ["api", "entities"]:
                     return self._send(200, service.get(parts[2]))
                 if len(parts) >= 2 and parts[0] == "api":

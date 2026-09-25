@@ -25,6 +25,17 @@ python3 app.py --db ./data.db --port 8303
 ## 核心对象
 
 - `case`：病例和调查状态；`contact`：接触者随访。
+- `batch`：检验批次；`sample`：样本，同时关联`batch_id`和`case_id`，重采样本用`resample_of`关联原失效样本。
+
+## 检验流程
+
+样本状态机：`collected`（待初筛）→ 初筛阳性进入`pending_review`（待复核），初筛阴性直接判`screened_negative`；复核阳性判`confirmed_positive`，复核阴性判`review_negative`；失效样本判`invalid`后可重采。
+
+- 复核阳性才确认病例（`reported`/`investigating`→`confirmed`），初筛阳性不直接改写诊断。
+- 复核阴性或样本失效时，病例保持原诊断。
+- 同一病例重复送检时，病例采纳最新有效结果（`lab_result`），失效样本不参与。
+- 没有样本记录的旧病例，检验视图为`pending_submission`（待送检）。
+- 批次尚有待处理样本时不能关闭（`close_batch`）。
 
 ## 主要接口
 
@@ -33,6 +44,9 @@ python3 app.py --db ./data.db --port 8303
 - `POST /api/<kind>`：创建对象；请求体为JSON。
 - `GET /api/entities/<id>`：读取对象当前版本。
 - `POST /api/entities/<id>/actions`：提交`{"action":"动作名","data":{...},"expected_version":数字}`。
+- `GET /api/batches/<id>/progress`：批次进度、各状态样本数和待处理样本数。
+- `GET /api/cases/<id>/lab`：病例的检验视图（待送检/待初筛/待复核/待重采/阴性/阳性）。
+- `GET /api/lab/pending`：检验科待办汇总（待初筛、待复核，按批次分组）。
 - `GET /api/audit`：读取审计记录。
 
 请求身份通过`X-User-Id`和`X-Role`请求头传入。创建和动作的可执行角色由规则引擎控制。
