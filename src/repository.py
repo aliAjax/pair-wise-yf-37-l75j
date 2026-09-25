@@ -54,7 +54,25 @@ class SQLiteRepository:
                     created_at TEXT NOT NULL,
                     PRIMARY KEY(actor_id, idem_key)
                 );
+                CREATE TABLE IF NOT EXISTS seq_store (
+                    name TEXT PRIMARY KEY,
+                    value INTEGER NOT NULL
+                );
             """)
+            connection.execute(
+                "INSERT OR IGNORE INTO seq_store(name, value) VALUES ('entity_seq', 0)"
+            )
+
+    def next_seq(self, name="entity_seq"):
+        """单调递增序号；同一秒内创建的对象也能按真实顺序排序。"""
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE seq_store SET value = value + 1 WHERE name = ?", (name,)
+            )
+            row = connection.execute(
+                "SELECT value FROM seq_store WHERE name = ?", (name,)
+            ).fetchone()
+            return int(row["value"])
 
     @staticmethod
     def _entity_from_row(row):

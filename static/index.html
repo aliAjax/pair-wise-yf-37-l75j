@@ -6,28 +6,76 @@
   <title>传染病暴发调查与接触网络</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; color: #1f2937; }
-    main { max-width: 820px; margin: auto; }
+    main { max-width: 860px; margin: auto; }
     pre { background: #f3f4f6; padding: 1rem; border-radius: 8px; overflow-x: auto; }
     button { padding: .5rem .8rem; cursor: pointer; }
+    .cards { display: flex; gap: .75rem; flex-wrap: wrap; margin: 1rem 0; }
+    .card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: .75rem 1rem; min-width: 9rem; }
+    .card .num { font-size: 1.6rem; font-weight: 600; }
+    .card .lbl { color: #6b7280; font-size: .85rem; }
+    table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: .4rem .6rem; text-align: left; }
   </style>
 </head>
 <body>
 <main>
   <h1>传染病暴发调查与接触网络</h1>
-  <p>这是最小演示页面。使用浏览器或 curl 调用 JSON API。</p>
-  <p><button onclick="checkHealth()">检查服务状态</button></p>
+  <p>使用浏览器或 curl 调用 JSON API。检验样本按批次和病例关联：初筛阳性进入复核，复核阳性才确认病例；复核阴性或样本失效时病例保持原诊断。</p>
+  <p>
+    <button onclick="checkHealth()">检查服务状态</button>
+    <button onclick="loadBoard()">刷新检验室看板</button>
+  </p>
   <pre id="result">等待操作</pre>
+  <section id="board" hidden>
+    <h2>检验室看板</h2>
+    <div class="cards" id="cards"></div>
+    <h3>批次进度</h3>
+    <table id="batches"><thead>
+      <tr><th>批次号</th><th>状态</th><th>样本数</th><th>待处理</th><th>复核阳性</th></tr>
+    </thead><tbody></tbody></table>
+    <h3>病例检验状态</h3>
+    <table id="cases"><thead>
+      <tr><th>病例</th><th>病例状态</th><th>检验状态</th><th>所在批次</th></tr>
+    </thead><tbody></tbody></table>
+  </section>
   <h2>常用接口</h2>
   <pre>GET  /health
-GET  /api/&lt;kind&gt;
+GET  /api/&lt;kind&gt;                     # cases / contacts / batches / samples
 POST /api/&lt;kind&gt;
 GET  /api/entities/&lt;id&gt;
-POST /api/entities/&lt;id&gt;/actions</pre>
+POST /api/entities/&lt;id&gt;/actions     # 初筛 screen_positive/screen_negative
+                                     # 复核 review_positive/review_negative
+                                     # 失效 mark_invalid（需 reason）
+POST /api/samples/&lt;id&gt;/recollect    # 失效样本重采
+GET  /api/batches/&lt;id&gt;/progress     # 批次进度
+GET  /api/lab/board                 # 检验室看板</pre>
 </main>
 <script>
 async function checkHealth() {
   const response = await fetch('/health');
   document.getElementById('result').textContent = JSON.stringify(await response.json(), null, 2);
+}
+function short(id) { return id ? id.slice(0, 8) : '—'; }
+async function loadBoard() {
+  const response = await fetch('/api/lab/board');
+  const b = await response.json();
+  document.getElementById('result').textContent = JSON.stringify(b, null, 2);
+  const cards = [
+    ['待处理样本', b.pending_samples],
+    ['待复核', b.pending_review],
+    ['失效样本', b.invalid_samples],
+    ['待送检病例', b.pending_submission_cases],
+  ];
+  document.getElementById('cards').innerHTML = cards.map(
+    ([lbl, num]) => `<div class="card"><div class="num">${num}</div><div class="lbl">${lbl}</div></div>`
+  ).join('');
+  document.querySelector('#batches tbody').innerHTML = b.batches.map(x =>
+    `<tr><td>${x.batch_no || short(x.id)}</td><td>${x.status}</td><td>${x.total}</td><td>${x.pending}</td><td>${x.confirmed}</td></tr>`
+  ).join('') || '<tr><td colspan="5">暂无批次</td></tr>';
+  document.querySelector('#cases tbody').innerHTML = b.cases.map(x =>
+    `<tr><td>${short(x.case_id)}</td><td>${x.status}</td><td>${x.lab_status.label}</td><td>${short(x.batch_id)}</td></tr>`
+  ).join('');
+  document.getElementById('board').hidden = false;
 }
 </script>
 </body>
